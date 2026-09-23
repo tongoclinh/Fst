@@ -27,11 +27,17 @@ Open **Fst → Settings…** (⌘,) to choose separate light/dark palettes, a fo
 
 The list follows the highlighter's programming and configuration extensions. Extensionless files, markup-only formats, generic data, and video types are excluded; TypeScript uses its text type even though `.ts` is also a video extension. Imported type declarations cover formats macOS does not otherwise recognize.
 
+Whitespace display is optional: spaces appear as dots and tabs as arrows, without changing copied or saved text. **Detect indentation** and **Insert spaces when pressing Tab** default to on; the fallback indent size is 4 (configurable from 1 to 8). Detection overrides the default typing mode for each file; a manual status-bar selection overrides detection.
+
 ## Editor controls
 
 The gutter numbers logical lines, including a final empty line. An incremental UTF-16 index keeps caret lookup fast and rescans only lines around edits; suffix offsets are adjusted after insertions/deletions. Columns count UTF-16 code units and tabs count as one, as noted in the status tooltip.
 
 The language menu defaults to automatic filename detection. Select a language to override highlighting for that window, or choose Automatic again. The encoding and line-ending indicators are informational; changing syntax does not convert or modify file contents.
+
+The indentation menu shows Spaces/Tabs, width, and whether the setting is detected, default, or manual. Detection samples up to 64 KiB/1,000 lines when loading a file; ambiguous files use defaults, and tab-only files use the configured width. Choose **Automatic** to re-detect the current contents. Soft Tab inserts spaces to the next stop; Backspace in a space-only indent removes to the previous stop. Enter carries indentation onto the new line, using spaces in soft-tab mode. Pasting does not convert tabs.
+
+**Tabs → Spaces** converts only tabs in leading whitespace, using the selected width, and switches the file to spaces. It preserves inline tabs, line endings, and the caret position; the whole conversion is undoable. It does not reindent existing spaces. Save never converts whitespace automatically. Use conversion deliberately: leading tabs can be significant in Makefiles or multiline strings.
 
 ## Quick Look
 

@@ -1,6 +1,6 @@
 # Fst
 
-A fast, minimal native macOS text editor. Single files, syntax highlighting, themes, and little else. macOS 14+.
+A fast, minimal native macOS text editor. Single files, syntax highlighting, themes, whitespace symbols, and per-file indentation controls. macOS 14+.
 
 https://github.com/user-attachments/assets/ae6e83e9-2507-4576-83d5-5b2cd2c7f296
 
