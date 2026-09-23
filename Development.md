@@ -39,6 +39,10 @@ The indentation menu shows Spaces/Tabs, width, and whether the setting is detect
 
 **Tabs → Spaces** converts only tabs in leading whitespace, using the selected width, and switches the file to spaces. It preserves inline tabs, line endings, and the caret position; the whole conversion is undoable. It does not reindent existing spaces. Save never converts whitespace automatically. Use conversion deliberately: leading tabs can be significant in Makefiles or multiline strings.
 
+**Show indent guides** and **Highlight active indent guide** are enabled by default in Settings, independently of whitespace symbols. The nearest indentation block containing the caret gets a stronger guide, not a background fill; its opener selects the block it opens. Disabling guides disables the highlight control without forgetting its value. Interior blank lines retain shared context, while trailing blank lines do not extend blocks. Guides are indentation-based rather than syntax-aware, so alignment and multiline strings can differ from semantic scope. Wrapped continuation text has no additional guides.
+
+See [IndentGuideIndex.swift](Fst/IndentGuideIndex.swift) for block boundaries and [WhitespaceLayoutManager.swift](Fst/WhitespaceLayoutManager.swift) for display-only rendering. Caret movement uses cached block lookup and drawing visits visible line fragments. Content edits rebuild the guide index across logical lines; incremental block repair is the upgrade path if large-file typing becomes costly. Guides never modify copied or saved text.
+
 ## Quick Look
 
 Fst embeds a native, sandboxed Quick Look preview extension covering the same declared text/source types as the editor, including SVG. Previews show selectable, highlighted source text and follow system appearance. They use default preview typography, independent of the main app's settings. Files larger than 1 MiB get an explicitly truncated preview; the extension reads only the prefix and preserves complete Unicode scalars.
