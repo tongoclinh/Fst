@@ -6,8 +6,12 @@ final class SettingsWindowController: NSWindowController {
     private let fontPicker = NSPopUpButton()
     private let sizeField = NSTextField()
     private let heightField = NSTextField()
+    private let indentSizeField = NSTextField()
     private let wrapButton = NSButton(checkboxWithTitle: "Wrap lines to window width", target: nil, action: nil)
     private let lineNumbersButton = NSButton(checkboxWithTitle: "Show line numbers", target: nil, action: nil)
+    private let whitespaceButton = NSButton(checkboxWithTitle: "Show whitespace", target: nil, action: nil)
+    private let detectIndentationButton = NSButton(checkboxWithTitle: "Detect indentation", target: nil, action: nil)
+    private let insertSpacesButton = NSButton(checkboxWithTitle: "Insert spaces when pressing Tab", target: nil, action: nil)
     private let defaultButton = NSButton(title: "Make Fst the Default Editor", target: nil, action: nil)
     private let status = NSTextField(wrappingLabelWithString: "")
     private let progress = NSProgressIndicator()
@@ -15,7 +19,7 @@ final class SettingsWindowController: NSWindowController {
     private var preferencesObserver: NSObjectProtocol?
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 580),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 720),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Settings"
         window.isReleasedWhenClosed = false
@@ -44,7 +48,7 @@ final class SettingsWindowController: NSWindowController {
             picker.target = self
             picker.action = #selector(changePreferences(_:))
         }
-        for (field, value, minimum, maximum) in [(sizeField, EditorPreferences.fontSize, 6, 48), (heightField, EditorPreferences.lineHeight, 80, 240)] {
+        for (field, value, minimum, maximum) in [(sizeField, EditorPreferences.fontSize, 6, 48), (heightField, EditorPreferences.lineHeight, 80, 240), (indentSizeField, Double(EditorPreferences.indentSize), 1, 8)] {
             let format = NumberFormatter()
             format.minimum = NSNumber(value: minimum)
             format.maximum = NSNumber(value: maximum)
@@ -55,12 +59,11 @@ final class SettingsWindowController: NSWindowController {
             field.target = self
             field.action = #selector(changePreferences(_:))
         }
-        wrapButton.state = EditorPreferences.wrapLines ? .on : .off
-        wrapButton.target = self
-        wrapButton.action = #selector(changePreferences(_:))
-        lineNumbersButton.state = EditorPreferences.showLineNumbers ? .on : .off
-        lineNumbersButton.target = self
-        lineNumbersButton.action = #selector(changePreferences(_:))
+        syncDisplayPreferences()
+        for button in [wrapButton, lineNumbersButton, whitespaceButton, detectIndentationButton, insertSpacesButton] {
+            button.target = self
+            button.action = #selector(changePreferences(_:))
+        }
         let folderButton = NSButton(title: "Open Themes Folder", target: self, action: #selector(openThemesFolder(_:)))
         let reloadButton = NSButton(title: "Reload Themes", target: self, action: #selector(reloadThemes(_:)))
         let themeActions = NSStackView(views: [folderButton, reloadButton])
@@ -71,7 +74,12 @@ final class SettingsWindowController: NSWindowController {
                               themeActions, themeStatus,
                               row("Font", fontPicker), row("Font size", sizeField, suffix: "pt"),
                               row("Line height", heightField, suffix: "%"), row("Line wrapping", wrapButton),
-                              row("Line numbers", lineNumbersButton)]
+                              row("Line numbers", lineNumbersButton), row("Whitespace", whitespaceButton),
+                              row("Indent detection", detectIndentationButton), row("Tab key", insertSpacesButton),
+                              row("Default indent size", indentSizeField, suffix: "spaces")]
+        for button in [whitespaceButton, detectIndentationButton, insertSpacesButton] {
+            button.setAccessibilityLabel(button.title)
+        }
 
         let title = NSTextField(labelWithString: "Default editor")
         title.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
@@ -172,11 +180,19 @@ final class SettingsWindowController: NSWindowController {
         if sender === heightField { EditorPreferences.lineHeight = heightField.doubleValue }
         if sender === wrapButton { EditorPreferences.wrapLines = wrapButton.state == .on }
         if sender === lineNumbersButton { EditorPreferences.showLineNumbers = lineNumbersButton.state == .on }
+        if sender === whitespaceButton { EditorPreferences.showWhitespace = whitespaceButton.state == .on }
+        if sender === detectIndentationButton { EditorPreferences.detectIndentation = detectIndentationButton.state == .on }
+        if sender === insertSpacesButton { EditorPreferences.insertSpaces = insertSpacesButton.state == .on }
+        if sender === indentSizeField { EditorPreferences.indentSize = indentSizeField.integerValue }
     }
 
     private func syncDisplayPreferences() {
         wrapButton.state = EditorPreferences.wrapLines ? .on : .off
         lineNumbersButton.state = EditorPreferences.showLineNumbers ? .on : .off
+        whitespaceButton.state = EditorPreferences.showWhitespace ? .on : .off
+        detectIndentationButton.state = EditorPreferences.detectIndentation ? .on : .off
+        insertSpacesButton.state = EditorPreferences.insertSpaces ? .on : .off
+        indentSizeField.integerValue = EditorPreferences.indentSize
     }
 
     @objc private func makeDefault(_ sender: NSButton) {

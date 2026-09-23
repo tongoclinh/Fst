@@ -2,6 +2,29 @@ import AppKit
 
 final class CodeTextView: NSTextView {
     var newline = "\n"
+    var indentation = Indentation(size: 4, spaces: true)
+
+    override func insertTab(_ sender: Any?) {
+        guard indentation.spaces else { super.insertTab(sender); return }
+        let source = string as NSString
+        let selection = selectedRange()
+        let start = source.lineRange(for: NSRange(location: selection.location, length: 0)).location
+        let column = indentation.column(in: source, range: NSRange(location: start, length: selection.location - start))
+        insertText(String(repeating: " ", count: indentation.size - column % indentation.size), replacementRange: selection)
+    }
+
+    override func deleteBackward(_ sender: Any?) {
+        let selection = selectedRange()
+        guard indentation.spaces, selection.length == 0, selection.location > 0 else {
+            super.deleteBackward(sender); return
+        }
+        let source = string as NSString
+        let start = source.lineRange(for: NSRange(location: selection.location, length: 0)).location
+        let prefix = source.substring(with: NSRange(location: start, length: selection.location - start))
+        guard !prefix.isEmpty, prefix.allSatisfy({ $0 == " " }) else { super.deleteBackward(sender); return }
+        let count = (prefix.count - 1) % indentation.size + 1
+        insertText("", replacementRange: NSRange(location: selection.location - count, length: count))
+    }
     var appearanceChanged: (() -> Void)?
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
@@ -34,7 +57,11 @@ final class CodeTextView: NSTextView {
         let location = selectedRange().location
         let line = source.lineRange(for: NSRange(location: location, length: 0))
         let prefix = source.substring(with: NSRange(location: line.location, length: location - line.location))
-        let indentation = String(prefix.prefix { $0 == " " || $0 == "\t" })
+        var indentation = String(prefix.prefix { $0 == " " || $0 == "\t" })
+        if self.indentation.spaces {
+            let width = self.indentation.column(in: indentation as NSString, range: NSRange(location: 0, length: (indentation as NSString).length))
+            indentation = String(repeating: " ", count: width)
+        }
         insertText(newline + indentation, replacementRange: selectedRange())
     }
 }
@@ -47,6 +74,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private let positionLabel = NSTextField(labelWithString: "Ln 1, Col 1")
     private let detailsLabel = NSTextField(labelWithString: "UTF-8 · LF · 1 line")
     let languagePicker = NSPopUpButton()
+    let indentPicker = NSPopUpButton()
+    private let convertButton = NSButton(title: "Tabs → Spaces", target: nil, action: nil)
+    private var detectedIndentation: (spaces: Bool, size: Int?)?
+    private var manualIndentation: Indentation?
     private var filename = ""
     private var languageOverride: String?
     private var replacingText = false
@@ -63,6 +94,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         scroll.clipsToBounds = true
         scroll.setContentHuggingPriority(.fittingSizeCompression, for: .vertical)
         scroll.setContentHuggingPriority(.fittingSizeCompression, for: .horizontal)
+        textView.textContainer?.replaceLayoutManager(WhitespaceLayoutManager())
         textView.isRichText = false
         textView.importsGraphics = false
         textView.allowsUndo = true
@@ -101,6 +133,17 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         languagePicker.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         languagePicker.isBordered = false
         languagePicker.setAccessibilityLabel("Syntax language")
+        indentPicker.target = self
+        indentPicker.action = #selector(changeIndentation(_:))
+        indentPicker.controlSize = .small
+        indentPicker.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        indentPicker.isBordered = false
+        indentPicker.setAccessibilityLabel("Indentation")
+        convertButton.target = self
+        convertButton.action = #selector(convertTabsToSpaces(_:))
+        convertButton.controlSize = .small
+        convertButton.bezelStyle = .rounded
+        convertButton.toolTip = "Convert leading tabs to spaces using this file’s indent size. Undoable."
         positionLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
         positionLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         detailsLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -108,9 +151,13 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         positionLabel.textColor = .secondaryLabelColor
         detailsLabel.textColor = .secondaryLabelColor
         let spacer = NSView()
-        let status = NSStackView(views: [positionLabel, spacer, detailsLabel, languagePicker])
+        let status = NSStackView(views: [positionLabel, spacer, detailsLabel, indentPicker, convertButton, languagePicker])
+        status.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 900), for: detailsLabel)
+        status.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 800), for: languagePicker)
+        status.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 700), for: positionLabel)
         status.orientation = .horizontal
         status.setContentHuggingPriority(.fittingSizeCompression, for: .horizontal)
+        status.setClippingResistancePriority(.defaultLow, for: .horizontal)
         status.spacing = 12
         status.edgeInsets = NSEdgeInsets(top: 4, left: 12, bottom: 4, right: 8)
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -155,6 +202,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     func setText(_ text: String, filename: String) {
         replacingText = true
         let source = text as NSString
+        manualIndentation = nil
+        detectedIndentation = EditorPreferences.detectIndentation ? Indentation.detect(source) : nil
         textView.newline = source.range(of: "\r\n").location != NSNotFound ? "\r\n"
             : (source.range(of: "\r").location != NSNotFound && source.range(of: "\n").location == NSNotFound ? "\r" : "\n")
         textView.string = text
@@ -163,6 +212,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         replacingText = false
         textView.undoManager?.removeAllActions()
         setLanguage(filename: filename)
+        applyIndentation()
         applyTypography()
         ruler.refresh()
         updateStatus()
@@ -177,6 +227,83 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     @objc func changeLanguage(_ sender: NSPopUpButton) {
         languageOverride = sender.indexOfSelectedItem == 0 ? nil : LanguageMode.all[sender.indexOfSelectedItem - 1].filename
         highlighter.setLanguage(filename: languageOverride ?? filename)
+    }
+
+    @objc func changeIndentation(_ sender: NSPopUpButton) {
+        if sender.selectedTag() == 0 {
+            manualIndentation = nil
+            detectedIndentation = EditorPreferences.detectIndentation ? Indentation.detect(textView.string as NSString) : nil
+        } else {
+            let tag = sender.selectedTag()
+            manualIndentation = Indentation(size: tag % 10, spaces: tag < 20)
+        }
+        applyIndentation()
+        applyTypography()
+    }
+
+    private func applyIndentation() {
+        let detected = EditorPreferences.detectIndentation ? detectedIndentation : nil
+        textView.indentation = manualIndentation ?? Indentation(size: detected?.size ?? EditorPreferences.indentSize,
+                                                               spaces: detected?.spaces ?? EditorPreferences.insertSpaces)
+        let current = textView.indentation
+        let origin = manualIndentation != nil ? "manual" : (detected != nil ? "detected" : "default")
+        indentPicker.removeAllItems()
+        indentPicker.addItem(withTitle: "\(current.spaces ? "Spaces" : "Tabs"): \(current.size) (\(origin))")
+        indentPicker.lastItem?.tag = -1
+        indentPicker.lastItem?.isEnabled = false
+        indentPicker.addItem(withTitle: "Automatic")
+        indentPicker.lastItem?.tag = 0
+        for spaces in [true, false] {
+            for size in 1...8 {
+                indentPicker.addItem(withTitle: "\(spaces ? "Spaces" : "Tabs"): \(size)")
+                indentPicker.lastItem?.tag = (spaces ? 10 : 20) + size
+            }
+        }
+        indentPicker.selectItem(at: 0)
+    }
+
+    @objc func convertTabsToSpaces(_ sender: Any?) {
+        let source = textView.string as NSString
+        var ranges = [NSRange](), replacements = [String]()
+        var offset = 0
+        while offset < source.length {
+            let line = source.lineRange(for: NSRange(location: offset, length: 0))
+            var column = 0
+            while offset < NSMaxRange(line) {
+                let character = source.character(at: offset)
+                if character == 9 {
+                    let count = textView.indentation.size - column % textView.indentation.size
+                    ranges.append(NSRange(location: offset, length: 1))
+                    replacements.append(String(repeating: " ", count: count))
+                    column += count
+                } else if character == 32 { column += 1 }
+                else { break }
+                offset += 1
+            }
+            offset = NSMaxRange(line)
+        }
+        guard !ranges.isEmpty else { return }
+        textView.breakUndoCoalescing()
+        guard textView.shouldChangeText(inRanges: ranges.map { NSValue(range: $0) }, replacementStrings: replacements) else { return }
+        let selections = textView.selectedRanges.map { $0.rangeValue }
+        func mapped(_ position: Int) -> Int {
+            position + zip(ranges, replacements).reduce(0) { result, edit in
+                result + (edit.0.location < position ? edit.1.utf16.count - 1 : 0)
+            }
+        }
+        textView.textStorage?.beginEditing()
+        for (range, replacement) in zip(ranges, replacements).reversed() {
+            textView.textStorage?.replaceCharacters(in: range, with: replacement)
+        }
+        textView.textStorage?.endEditing()
+        textView.didChangeText()
+        textView.undoManager?.setActionName("Convert Tabs to Spaces")
+        textView.selectedRanges = selections.map {
+            NSValue(range: NSRange(location: mapped($0.location), length: mapped(NSMaxRange($0)) - mapped($0.location)))
+        }
+        manualIndentation = Indentation(size: textView.indentation.size, spaces: true)
+        applyIndentation()
+        applyTypography()
     }
 
     func textViewDidChangeSelection(_ notification: Notification) { updateStatus() }
@@ -198,6 +325,11 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private func applyPreferences() {
         applyWrapping()
         textView.enclosingScrollView?.rulersVisible = EditorPreferences.showLineNumbers
+        (textView.layoutManager as? WhitespaceLayoutManager)?.showWhitespace = EditorPreferences.showWhitespace
+        if EditorPreferences.detectIndentation && detectedIndentation == nil {
+            detectedIndentation = Indentation.detect(textView.string as NSString)
+        }
+        applyIndentation()
         applyTypography()
         applyTheme()
         ruler.refresh()
@@ -223,7 +355,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func applyTypography() {
-        let paragraph = EditorPreferences.paragraphStyle
+        let paragraph = EditorPreferences.paragraphStyle.mutableCopy() as! NSMutableParagraphStyle
+        paragraph.defaultTabInterval = (" " as NSString).size(withAttributes: [.font: EditorPreferences.font]).width * CGFloat(textView.indentation.size)
         textView.font = EditorPreferences.font
         textView.defaultParagraphStyle = paragraph
         textView.typingAttributes[.font] = EditorPreferences.font

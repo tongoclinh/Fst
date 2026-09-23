@@ -13,6 +13,22 @@ struct EditorPreferences {
         get { UserDefaults.standard.object(forKey: "showLineNumbers") as? Bool ?? true }
         set { set(newValue, for: "showLineNumbers") }
     }
+    static var showWhitespace: Bool {
+        get { UserDefaults.standard.bool(forKey: "showWhitespace") }
+        set { set(newValue, for: "showWhitespace") }
+    }
+    static var detectIndentation: Bool {
+        get { UserDefaults.standard.object(forKey: "detectIndentation") as? Bool ?? true }
+        set { set(newValue, for: "detectIndentation") }
+    }
+    static var insertSpaces: Bool {
+        get { UserDefaults.standard.object(forKey: "insertSpaces") as? Bool ?? true }
+        set { set(newValue, for: "insertSpaces") }
+    }
+    static var indentSize: Int {
+        get { Int(number("indentSize", default: 4, range: 1...8)) }
+        set { set(min(max(newValue, 1), 8), for: "indentSize") }
+    }
     static var fontName: String {
         get { UserDefaults.standard.string(forKey: "fontName") ?? "System Mono" }
         set { set(newValue, for: "fontName") }

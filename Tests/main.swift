@@ -170,6 +170,56 @@ func testDocumentsAndEditing() throws {
         }
         NotificationCenter.default.post(name: .editorPreferencesChanged, object: nil)
     }
+    let indentKeys = ["detectIndentation", "insertSpaces", "indentSize", "showWhitespace"]
+    let oldIndentPreferences = indentKeys.map { UserDefaults.standard.object(forKey: $0) }
+    defer {
+        for (key, value) in zip(indentKeys, oldIndentPreferences) {
+            if let value { UserDefaults.standard.set(value, forKey: key) }
+            else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+        NotificationCenter.default.post(name: .editorPreferencesChanged, object: nil)
+    }
+    EditorPreferences.detectIndentation = true
+    EditorPreferences.insertSpaces = true
+    EditorPreferences.indentSize = 4
+    for size in [2, 4, 8] {
+        let indent = String(repeating: " ", count: size)
+        editor.setText("root\n\(indent)child\n\(indent)\(indent)nested\nroot", filename: "test.txt")
+        expect(text.indentation == Indentation(size: size, spaces: true), "Detect repeated indentation steps")
+    }
+    editor.setText("root\n\tchild\n\t\tnested", filename: "test.txt")
+    expect(!text.indentation.spaces, "Tab-indented documents retain hard tabs")
+    editor.indentPicker.selectItem(withTag: 14)
+    editor.changeIndentation(editor.indentPicker)
+    editor.setText("  ", filename: "test.txt")
+    text.setSelectedRange(NSRange(location: 2, length: 0))
+    text.insertTab(nil)
+    expect(text.string == "    ", "Soft Tab advances to next stop, not a fixed number of spaces")
+    text.deleteBackward(nil)
+    expect(text.string.isEmpty, "Backspace removes one indentation stop")
+    editor.setText("  \t🐢\tdata\r\n\tchild\r\n", filename: "test.txt")
+    editor.indentPicker.selectItem(withTag: 14)
+    editor.changeIndentation(editor.indentPicker)
+    let unconverted = text.string
+    text.setSelectedRange(NSRange(location: 5, length: 0))
+    text.breakUndoCoalescing()
+    editor.convertTabsToSpaces(nil)
+    expect(text.string == "    🐢\tdata\r\n    child\r\n", "Convert only leading tabs, preserving Unicode, inline tabs and CRLF")
+    expect(text.selectedRange().location == 6, "Conversion keeps caret beside the same character")
+    text.undoManager?.undo()
+    expect(text.string == unconverted, "One undo restores all converted tabs")
+    text.undoManager?.redo()
+    expect(text.string == "    🐢\tdata\r\n    child\r\n", "Redo restores converted indentation")
+    editor.setText("\tvalue\r\n", filename: "test.txt")
+    EditorPreferences.showWhitespace = true
+    let unchangedTabs = try document.data(ofType: "Text Document")
+    expect(unchangedTabs == Data([0xEF, 0xBB, 0xBF]) + Data("\tvalue\r\n".utf8), "Save and whitespace display never convert tabs")
+    EditorPreferences.detectIndentation = false
+    editor.setText("\tvalue", filename: "test.txt")
+    text.setSelectedRange(NSRange(location: 6, length: 0))
+    text.insertNewline(nil)
+    expect(text.string == "\tvalue\n    ", "Soft indentation normalizes only the newly inserted newline prefix")
+    print("PASS: indentation detection, soft tabs, conversion undo/redo, caret and unchanged saves")
     EditorPreferences.fontName = "Menlo"
     EditorPreferences.fontSize = 18
     EditorPreferences.lineHeight = 160
