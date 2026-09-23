@@ -23,9 +23,7 @@ struct IndentGuideIndex {
     private(set) var lines: [Line]
     private(set) var blocks: [Block] = []
 
-    // ponytail: rebuild on edits; incremental block repair if large-file typing becomes costly.
-    init(source: NSString, lineIndex: LineIndex, indentation: Indentation) {
-        let starts = lineIndex.starts
+    init(source: NSString, starts: [Int], indentation: Indentation) {
         self.starts = starts
         sourceLength = source.length
         indentSize = max(1, indentation.size)

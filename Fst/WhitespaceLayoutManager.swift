@@ -21,8 +21,8 @@ final class WhitespaceLayoutManager: NSLayoutManager {
     private(set) var activeGuideBlock: IndentGuideIndex.Block?
     private var guideSelectionOffset = 0
 
-    func updateGuides(source: NSString, lineIndex: LineIndex, indentation: Indentation) {
-        guideIndex = IndentGuideIndex(source: source, lineIndex: lineIndex, indentation: indentation)
+    func setGuides(_ index: IndentGuideIndex?) {
+        guideIndex = index
         activeGuideBlock = guideIndex?.activeBlock(atCharacterOffset: guideSelectionOffset)
         invalidateGuideDisplay()
     }

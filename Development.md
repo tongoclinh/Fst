@@ -37,11 +37,13 @@ The language menu defaults to automatic filename detection. Select a language to
 
 The indentation menu shows Spaces/Tabs, width, and whether the setting is detected, default, or manual. Detection samples up to 64 KiB/1,000 lines when loading a file; ambiguous files use defaults, and tab-only files use the configured width. Choose **Automatic** to re-detect the current contents. Soft Tab inserts spaces to the next stop; Backspace in a space-only indent removes to the previous stop. Enter carries indentation onto the new line, using spaces in soft-tab mode. Pasting does not convert tabs.
 
+Re-enabling detection recalculates from current contents rather than reusing the pre-disable result. Soft tabs measure the displayed prefix so canonically equivalent Unicode text reaches the same tab stop.
+
 **Tabs → Spaces** converts only tabs in leading whitespace, using the selected width, and switches the file to spaces. It preserves inline tabs, line endings, and the caret position; the whole conversion is undoable. It does not reindent existing spaces. Save never converts whitespace automatically. Use conversion deliberately: leading tabs can be significant in Makefiles or multiline strings.
 
 **Show indent guides** and **Highlight active indent guide** are enabled by default in Settings, independently of whitespace symbols. The nearest indentation block containing the caret gets a stronger guide, not a background fill; its opener selects the block it opens. Disabling guides disables the highlight control without forgetting its value. Interior blank lines retain shared context, while trailing blank lines do not extend blocks. Guides are indentation-based rather than syntax-aware, so alignment and multiline strings can differ from semantic scope. Wrapped continuation text has no additional guides.
 
-See [IndentGuideIndex.swift](Fst/IndentGuideIndex.swift) for block boundaries and [WhitespaceLayoutManager.swift](Fst/WhitespaceLayoutManager.swift) for display-only rendering. Caret movement uses cached block lookup and drawing visits visible line fragments. Content edits rebuild the guide index across logical lines; incremental block repair is the upgrade path if large-file typing becomes costly. Guides never modify copied or saved text.
+See [IndentGuideIndex.swift](Fst/IndentGuideIndex.swift) for block boundaries and [WhitespaceLayoutManager.swift](Fst/WhitespaceLayoutManager.swift) for display-only rendering. Caret movement uses cached block lookup and drawing visits visible line fragments. After edits, guides temporarily disappear until a background rebuild completes following a short typing pause; stale results are discarded. Disabled guides do not rebuild. Full-index background work remains proportional to the number of lines. Guides never modify copied or saved text.
 
 ## Quick Look
 

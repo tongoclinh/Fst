@@ -9,7 +9,14 @@ final class CodeTextView: NSTextView {
         let source = string as NSString
         let selection = selectedRange()
         let start = source.lineRange(for: NSRange(location: selection.location, length: 0)).location
-        let column = indentation.column(in: source, range: NSRange(location: start, length: selection.location - start))
+        let prefix = source.substring(with: NSRange(location: start, length: selection.location - start))
+        let font = self.font ?? EditorPreferences.font
+        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
+        var column = 0
+        for run in prefix.components(separatedBy: "\t").enumerated() {
+            if run.offset > 0 { column += indentation.size - column % indentation.size }
+            column += Int(((run.element as NSString).size(withAttributes: [.font: font]).width / spaceWidth).rounded())
+        }
         insertText(String(repeating: " ", count: indentation.size - column % indentation.size), replacementRange: selection)
     }
 
@@ -310,13 +317,38 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     private var guideIndentSize: Int?
+    private var guideGeneration = 0
+    private var guideWork: DispatchWorkItem?
+    private let guideQueue = DispatchQueue(label: "Fst.indent-guides", qos: .userInitiated)
+    private var detectionEnabled = EditorPreferences.detectIndentation
+    private var guidesEnabled = EditorPreferences.showIndentGuides
 
     private func updateIndentGuides() {
         guard let layout = textView.layoutManager as? WhitespaceLayoutManager,
               let source = textView.textStorage?.mutableString else { return }
+        guideGeneration += 1
+        guideWork?.cancel()
+        layout.setGuides(nil)
         guideIndentSize = textView.indentation.size
-        layout.updateGuides(source: source, lineIndex: lineIndex, indentation: textView.indentation)
-        layout.updateGuideSelection(characterOffset: min(textView.selectedRange().location, source.length))
+        guard EditorPreferences.showIndentGuides else { return }
+        let generation = guideGeneration
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.guideGeneration == generation else { return }
+            let snapshot = source.copy() as! NSString
+            let starts = self.lineIndex.starts
+            let indentation = self.textView.indentation
+            self.guideQueue.async { [weak self] in
+                let index = IndentGuideIndex(source: snapshot, starts: starts, indentation: indentation)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.guideGeneration == generation else { return }
+                    let layout = self.textView.layoutManager as? WhitespaceLayoutManager
+                    layout?.setGuides(index)
+                    layout?.updateGuideSelection(characterOffset: self.textView.selectedRange().location)
+                }
+            }
+        }
+        guideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100), execute: work)
     }
 
     func textViewDidChangeSelection(_ notification: Notification) { updateStatus() }
@@ -344,10 +376,16 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             layout.showIndentGuides = EditorPreferences.showIndentGuides
             layout.highlightActiveIndentGuide = EditorPreferences.highlightActiveIndentGuide
         }
-        if EditorPreferences.detectIndentation && detectedIndentation == nil {
+        let shouldDetect = EditorPreferences.detectIndentation && (!detectionEnabled || detectedIndentation == nil)
+        detectionEnabled = EditorPreferences.detectIndentation
+        if shouldDetect {
             detectedIndentation = Indentation.detect(textView.string as NSString)
         }
         applyIndentation()
+        if guidesEnabled != EditorPreferences.showIndentGuides {
+            guidesEnabled = EditorPreferences.showIndentGuides
+            updateIndentGuides()
+        }
         applyTypography()
         applyTheme()
         ruler.refresh()

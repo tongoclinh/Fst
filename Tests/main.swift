@@ -170,7 +170,7 @@ func testDocumentsAndEditing() throws {
         }
         NotificationCenter.default.post(name: .editorPreferencesChanged, object: nil)
     }
-    let indentKeys = ["detectIndentation", "insertSpaces", "indentSize", "showWhitespace"]
+    let indentKeys = ["detectIndentation", "insertSpaces", "indentSize", "showWhitespace", "showIndentGuides"]
     let oldIndentPreferences = indentKeys.map { UserDefaults.standard.object(forKey: $0) }
     defer {
         for (key, value) in zip(indentKeys, oldIndentPreferences) {
@@ -182,6 +182,7 @@ func testDocumentsAndEditing() throws {
     EditorPreferences.detectIndentation = true
     EditorPreferences.insertSpaces = true
     EditorPreferences.indentSize = 4
+    EditorPreferences.showIndentGuides = true
     for size in [2, 4, 8] {
         let indent = String(repeating: " ", count: size)
         editor.setText("root\n\(indent)child\n\(indent)\(indent)nested\nroot", filename: "test.txt")
@@ -223,6 +224,14 @@ func testDocumentsAndEditing() throws {
     let guideSource = "root:\n  first:\n    one\n\n    two\n  second:\n    three\nend\n"
     editor.setText(guideSource, filename: "test.txt")
     let guideLayout = text.layoutManager as! WhitespaceLayoutManager
+    func waitForGuides() {
+        let deadline = Date(timeIntervalSinceNow: 3)
+        while guideLayout.guideIndex == nil && Date() < deadline {
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
+        }
+        expect(guideLayout.guideIndex != nil, "Guide rebuild must finish")
+    }
+    waitForGuides()
     func guideAt(_ word: String) -> IndentGuideIndex.Block? {
         text.setSelectedRange(NSRange(location: (guideSource as NSString).range(of: word).location, length: 0))
         return guideLayout.activeGuideBlock
@@ -237,12 +246,34 @@ func testDocumentsAndEditing() throws {
     text.setSelectedRange(NSRange(location: text.textStorage!.length, length: 0))
     expect(guideLayout.activeGuideBlock == nil, "Trailing EOF blank does not extend a block")
     text.insertText("  tail", replacementRange: text.selectedRange())
+    waitForGuides()
     expect(guideLayout.activeGuideBlock?.openerLine == 7, "Editing updates block structure")
     editor.setText("root\n\tchild\n\t  grandchild", filename: "test.txt")
     editor.indentPicker.selectItem(withTag: 24)
     editor.changeIndentation(editor.indentPicker)
+    waitForGuides()
     expect(guideLayout.guideIndex?.lines[2].indentationColumn == 6, "Guide columns expand mixed tabs and spaces")
     print("PASS: active indentation blocks, sibling boundaries, blank lines, EOF, edits and mixed tabs")
+    EditorPreferences.showIndentGuides = false
+    text.insertText("x", replacementRange: NSRange(location: 0, length: 0))
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
+    expect(guideLayout.guideIndex == nil, "Disabled guides must not rebuild after edits")
+    EditorPreferences.showIndentGuides = true
+    waitForGuides()
+    expect(guideLayout.guideIndex?.sourceLength == text.textStorage!.length, "Re-enabled guides use current content")
+    EditorPreferences.detectIndentation = true
+    editor.setText("root\n  child\n    nested\nroot", filename: "test.txt")
+    EditorPreferences.detectIndentation = false
+    text.insertText("root\n    child\n        nested\nroot", replacementRange: NSRange(location: 0, length: text.textStorage!.length))
+    EditorPreferences.detectIndentation = true
+    expect(text.indentation.size == 4, "Re-enabling detection discards stale indentation")
+    for prefix in ["é", "e\u{301}"] {
+        editor.setText(prefix + "X", filename: "test.txt")
+        text.indentation = Indentation(size: 4, spaces: true)
+        text.setSelectedRange(NSRange(location: (prefix as NSString).length, length: 0))
+        text.insertTab(nil)
+        expect(text.string == prefix + "   X", "Equivalent Unicode graphemes reach the same tab stop")
+    }
     EditorPreferences.fontName = "Menlo"
     EditorPreferences.fontSize = 18
     EditorPreferences.lineHeight = 160
