@@ -10,6 +10,8 @@ final class SettingsWindowController: NSWindowController {
     private let wrapButton = NSButton(checkboxWithTitle: "Wrap lines to window width", target: nil, action: nil)
     private let lineNumbersButton = NSButton(checkboxWithTitle: "Show line numbers", target: nil, action: nil)
     private let whitespaceButton = NSButton(checkboxWithTitle: "Show whitespace", target: nil, action: nil)
+    private let indentGuidesButton = NSButton(checkboxWithTitle: "Show indent guides", target: nil, action: nil)
+    private let activeIndentGuideButton = NSButton(checkboxWithTitle: "Highlight active indent guide", target: nil, action: nil)
     private let detectIndentationButton = NSButton(checkboxWithTitle: "Detect indentation", target: nil, action: nil)
     private let insertSpacesButton = NSButton(checkboxWithTitle: "Insert spaces when pressing Tab", target: nil, action: nil)
     private let defaultButton = NSButton(title: "Make Fst the Default Editor", target: nil, action: nil)
@@ -19,7 +21,7 @@ final class SettingsWindowController: NSWindowController {
     private var preferencesObserver: NSObjectProtocol?
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 720),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 784),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Settings"
         window.isReleasedWhenClosed = false
@@ -60,7 +62,7 @@ final class SettingsWindowController: NSWindowController {
             field.action = #selector(changePreferences(_:))
         }
         syncDisplayPreferences()
-        for button in [wrapButton, lineNumbersButton, whitespaceButton, detectIndentationButton, insertSpacesButton] {
+        for button in [wrapButton, lineNumbersButton, whitespaceButton, indentGuidesButton, activeIndentGuideButton, detectIndentationButton, insertSpacesButton] {
             button.target = self
             button.action = #selector(changePreferences(_:))
         }
@@ -75,9 +77,10 @@ final class SettingsWindowController: NSWindowController {
                               row("Font", fontPicker), row("Font size", sizeField, suffix: "pt"),
                               row("Line height", heightField, suffix: "%"), row("Line wrapping", wrapButton),
                               row("Line numbers", lineNumbersButton), row("Whitespace", whitespaceButton),
+                              row("Indent guides", indentGuidesButton), row("", activeIndentGuideButton),
                               row("Indent detection", detectIndentationButton), row("Tab key", insertSpacesButton),
                               row("Default indent size", indentSizeField, suffix: "spaces")]
-        for button in [whitespaceButton, detectIndentationButton, insertSpacesButton] {
+        for button in [whitespaceButton, indentGuidesButton, activeIndentGuideButton, detectIndentationButton, insertSpacesButton] {
             button.setAccessibilityLabel(button.title)
         }
 
@@ -181,6 +184,8 @@ final class SettingsWindowController: NSWindowController {
         if sender === wrapButton { EditorPreferences.wrapLines = wrapButton.state == .on }
         if sender === lineNumbersButton { EditorPreferences.showLineNumbers = lineNumbersButton.state == .on }
         if sender === whitespaceButton { EditorPreferences.showWhitespace = whitespaceButton.state == .on }
+        if sender === indentGuidesButton { EditorPreferences.showIndentGuides = indentGuidesButton.state == .on }
+        if sender === activeIndentGuideButton { EditorPreferences.highlightActiveIndentGuide = activeIndentGuideButton.state == .on }
         if sender === detectIndentationButton { EditorPreferences.detectIndentation = detectIndentationButton.state == .on }
         if sender === insertSpacesButton { EditorPreferences.insertSpaces = insertSpacesButton.state == .on }
         if sender === indentSizeField { EditorPreferences.indentSize = indentSizeField.integerValue }
@@ -190,6 +195,9 @@ final class SettingsWindowController: NSWindowController {
         wrapButton.state = EditorPreferences.wrapLines ? .on : .off
         lineNumbersButton.state = EditorPreferences.showLineNumbers ? .on : .off
         whitespaceButton.state = EditorPreferences.showWhitespace ? .on : .off
+        indentGuidesButton.state = EditorPreferences.showIndentGuides ? .on : .off
+        activeIndentGuideButton.state = EditorPreferences.highlightActiveIndentGuide ? .on : .off
+        activeIndentGuideButton.isEnabled = EditorPreferences.showIndentGuides
         detectIndentationButton.state = EditorPreferences.detectIndentation ? .on : .off
         insertSpacesButton.state = EditorPreferences.insertSpaces ? .on : .off
         indentSizeField.integerValue = EditorPreferences.indentSize

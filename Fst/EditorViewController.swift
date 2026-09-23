@@ -176,6 +176,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         highlighter.onEdit = { [weak self] storage, range, delta in
             guard let self, !self.replacingText else { return }
             self.lineIndex.update(storage.mutableString, editedRange: range, delta: delta)
+            self.updateIndentGuides()
             self.ruler.refresh()
         }
         textView.appearanceChanged = { [weak self] in self?.applyTheme() }
@@ -214,6 +215,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         setLanguage(filename: filename)
         applyIndentation()
         applyTypography()
+        updateIndentGuides()
         ruler.refresh()
         updateStatus()
     }
@@ -245,6 +247,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let detected = EditorPreferences.detectIndentation ? detectedIndentation : nil
         textView.indentation = manualIndentation ?? Indentation(size: detected?.size ?? EditorPreferences.indentSize,
                                                                spaces: detected?.spaces ?? EditorPreferences.insertSpaces)
+        if guideIndentSize != textView.indentation.size { updateIndentGuides() }
         let current = textView.indentation
         let origin = manualIndentation != nil ? "manual" : (detected != nil ? "detected" : "default")
         indentPicker.removeAllItems()
@@ -306,6 +309,16 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         applyTypography()
     }
 
+    private var guideIndentSize: Int?
+
+    private func updateIndentGuides() {
+        guard let layout = textView.layoutManager as? WhitespaceLayoutManager,
+              let source = textView.textStorage?.mutableString else { return }
+        guideIndentSize = textView.indentation.size
+        layout.updateGuides(source: source, lineIndex: lineIndex, indentation: textView.indentation)
+        layout.updateGuideSelection(characterOffset: min(textView.selectedRange().location, source.length))
+    }
+
     func textViewDidChangeSelection(_ notification: Notification) { updateStatus() }
     func textDidChange(_ notification: Notification) { updateStatus() }
 
@@ -314,6 +327,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let source = textView.textStorage!.mutableString
         let offset = min(textView.selectedRange().location, source.length)
         let line = lineIndex.line(at: offset)
+        (textView.layoutManager as? WhitespaceLayoutManager)?.updateGuideSelection(characterOffset: offset)
         // Columns count UTF-16 code units, matching TextKit selections.
         positionLabel.stringValue = "Ln \(line + 1), Col \(offset - lineIndex.starts[line] + 1)"
         positionLabel.toolTip = "Columns count UTF-16 code units; tabs count as one."
@@ -326,6 +340,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         applyWrapping()
         textView.enclosingScrollView?.rulersVisible = EditorPreferences.showLineNumbers
         (textView.layoutManager as? WhitespaceLayoutManager)?.showWhitespace = EditorPreferences.showWhitespace
+        if let layout = textView.layoutManager as? WhitespaceLayoutManager {
+            layout.showIndentGuides = EditorPreferences.showIndentGuides
+            layout.highlightActiveIndentGuide = EditorPreferences.highlightActiveIndentGuide
+        }
         if EditorPreferences.detectIndentation && detectedIndentation == nil {
             detectedIndentation = Indentation.detect(textView.string as NSString)
         }

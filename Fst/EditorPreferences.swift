@@ -17,6 +17,14 @@ struct EditorPreferences {
         get { UserDefaults.standard.bool(forKey: "showWhitespace") }
         set { set(newValue, for: "showWhitespace") }
     }
+    static var showIndentGuides: Bool {
+        get { UserDefaults.standard.object(forKey: "showIndentGuides") as? Bool ?? true }
+        set { set(newValue, for: "showIndentGuides") }
+    }
+    static var highlightActiveIndentGuide: Bool {
+        get { UserDefaults.standard.object(forKey: "highlightActiveIndentGuide") as? Bool ?? true }
+        set { set(newValue, for: "highlightActiveIndentGuide") }
+    }
     static var detectIndentation: Bool {
         get { UserDefaults.standard.object(forKey: "detectIndentation") as? Bool ?? true }
         set { set(newValue, for: "detectIndentation") }

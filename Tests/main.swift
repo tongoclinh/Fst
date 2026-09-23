@@ -220,6 +220,29 @@ func testDocumentsAndEditing() throws {
     text.insertNewline(nil)
     expect(text.string == "\tvalue\n    ", "Soft indentation normalizes only the newly inserted newline prefix")
     print("PASS: indentation detection, soft tabs, conversion undo/redo, caret and unchanged saves")
+    let guideSource = "root:\n  first:\n    one\n\n    two\n  second:\n    three\nend\n"
+    editor.setText(guideSource, filename: "test.txt")
+    let guideLayout = text.layoutManager as! WhitespaceLayoutManager
+    func guideAt(_ word: String) -> IndentGuideIndex.Block? {
+        text.setSelectedRange(NSRange(location: (guideSource as NSString).range(of: word).location, length: 0))
+        return guideLayout.activeGuideBlock
+    }
+    expect(guideAt("first") == guideAt("two"), "Opener and body activate the same block")
+    let firstBlock = guideAt("one")
+    expect(firstBlock?.openerLine == 1 && firstBlock?.endLine == 4, "Nested block ends before sibling")
+    expect(guideAt("three")?.openerLine == 5, "Caret switches active guide to sibling block")
+    expect(guideAt("end") == nil, "Top-level terminal line has no active block")
+    text.setSelectedRange(NSRange(location: editor.lineIndex.starts[3], length: 0))
+    expect(guideLayout.activeGuideBlock == firstBlock, "Internal blank line retains containing block")
+    text.setSelectedRange(NSRange(location: text.textStorage!.length, length: 0))
+    expect(guideLayout.activeGuideBlock == nil, "Trailing EOF blank does not extend a block")
+    text.insertText("  tail", replacementRange: text.selectedRange())
+    expect(guideLayout.activeGuideBlock?.openerLine == 7, "Editing updates block structure")
+    editor.setText("root\n\tchild\n\t  grandchild", filename: "test.txt")
+    editor.indentPicker.selectItem(withTag: 24)
+    editor.changeIndentation(editor.indentPicker)
+    expect(guideLayout.guideIndex?.lines[2].indentationColumn == 6, "Guide columns expand mixed tabs and spaces")
+    print("PASS: active indentation blocks, sibling boundaries, blank lines, EOF, edits and mixed tabs")
     EditorPreferences.fontName = "Menlo"
     EditorPreferences.fontSize = 18
     EditorPreferences.lineHeight = 160
