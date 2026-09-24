@@ -12,27 +12,32 @@ private final class PreviewEditorView: NSTextView {
 final class PreviewViewController: NSViewController, QLPreviewingController {
     private let textView = PreviewEditorView()
     private let note = NSTextField(labelWithString: "")
+    private let lineIndex = LineIndex()
+    private var ruler: LineNumberRuler!
     private var highlighter: SyntaxHighlighter!
     private var request = 0
 
     override func loadView() {
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
-        scroll.hasHorizontalScroller = true
+        scroll.hasHorizontalScroller = false
         scroll.autohidesScrollers = true
         textView.isEditable = false
         textView.isRichText = false
         textView.isSelectable = true
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.textContainerInset = NSSize(width: 16, height: 16)
-        textView.isHorizontallyResizable = true
+        textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = false
-        textView.textContainer?.containerSize = textView.maxSize
+        textView.textContainer?.widthTracksTextView = true
         textView.layoutManager?.allowsNonContiguousLayout = true
         scroll.documentView = textView
+        ruler = LineNumberRuler(scrollView: scroll, textView: textView, index: lineIndex)
+        scroll.verticalRulerView = ruler
+        scroll.hasVerticalRuler = true
+        scroll.rulersVisible = true
         note.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         note.textColor = .secondaryLabelColor
         view = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
@@ -53,6 +58,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         textView.backgroundColor = theme.background
         textView.textColor = theme.foreground
         highlighter.theme = theme
+        ruler.needsDisplay = true
     }
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
@@ -64,6 +70,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                 guard current == request else { handler(CocoaError(.userCancelled)); return }
                 loadViewIfNeeded()
                 textView.string = preview.text
+                lineIndex.rebuild(preview.text as NSString)
+                ruler.refresh()
                 highlighter.setLanguage(filename: url.lastPathComponent)
                 note.stringValue = preview.truncated ? "Preview limited to the first 1 MiB." : url.lastPathComponent
                 preferredContentSize = NSSize(width: 800, height: 600)

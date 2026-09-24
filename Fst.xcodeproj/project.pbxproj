@@ -15,6 +15,8 @@
 		D00000000000000000000002 /* Fst/SyntaxLexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000002 /* Fst/SyntaxLexer.swift */; };
 		D00000000000000000000003 /* Fst/SyntaxHighlighter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000003 /* Fst/SyntaxHighlighter.swift */; };
 		D00000000000000000000004 /* Fst/Performance.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000004 /* Fst/Performance.swift */; };
+		D00000000000000000000005 /* Fst/LineIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000005 /* Fst/LineIndex.swift */; };
+		D00000000000000000000006 /* Fst/LineNumberRuler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000006 /* Fst/LineNumberRuler.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +50,8 @@
 		C00000000000000000000002 /* Fst/SyntaxLexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fst/SyntaxLexer.swift; sourceTree = SOURCE_ROOT; };
 		C00000000000000000000003 /* Fst/SyntaxHighlighter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fst/SyntaxHighlighter.swift; sourceTree = SOURCE_ROOT; };
 		C00000000000000000000004 /* Fst/Performance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fst/Performance.swift; sourceTree = SOURCE_ROOT; };
+		C00000000000000000000005 /* Fst/LineIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fst/LineIndex.swift; sourceTree = SOURCE_ROOT; };
+		C00000000000000000000006 /* Fst/LineNumberRuler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fst/LineNumberRuler.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -130,6 +134,8 @@
 				C00000000000000000000001 /* Fst/EditorTheme.swift */,
 				C00000000000000000000002 /* Fst/SyntaxLexer.swift */,
 				C00000000000000000000003 /* Fst/SyntaxHighlighter.swift */,
+				C00000000000000000000005 /* Fst/LineIndex.swift */,
+				C00000000000000000000006 /* Fst/LineNumberRuler.swift */,
 			);
 			name = "Quick Look Shared Sources";
 			sourceTree = "<group>";
@@ -243,6 +249,8 @@
 				D00000000000000000000001 /* Fst/EditorTheme.swift in Sources */,
 				D00000000000000000000002 /* Fst/SyntaxLexer.swift in Sources */,
 				D00000000000000000000003 /* Fst/SyntaxHighlighter.swift in Sources */,
+				D00000000000000000000005 /* Fst/LineIndex.swift in Sources */,
+				D00000000000000000000006 /* Fst/LineNumberRuler.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */

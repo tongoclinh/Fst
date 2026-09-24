@@ -306,6 +306,53 @@ func testDocumentsAndEditing() throws {
     expect(wideHeight > 0 && narrowHeight > wideHeight, "Long lines wrap and reflow when the window narrows")
     expect(wrappingEditor.lineIndex.count == 2, "Soft wraps must preserve logical line numbers")
     expect(!wrappingText.enclosingScrollView!.hasHorizontalScroller, "Wrapped text doesn't need horizontal scrolling")
+    let previewFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".swift")
+    defer { try? FileManager.default.removeItem(at: previewFile) }
+    let previewSource = String(repeating: "abcdefghij", count: 100) + "\r\n\r\nlast\r\n"
+    try previewSource.write(to: previewFile, atomically: true, encoding: .utf8)
+    EditorPreferences.wrapLines = false
+    EditorPreferences.showLineNumbers = false
+    let preview = PreviewViewController()
+    let previewWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
+                                 styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+    previewWindow.contentView = preview.view
+    var previewLoaded = false
+    preview.preparePreviewOfFile(at: previewFile) { error in
+        expect(error == nil, "Quick Look must load source files")
+        previewLoaded = true
+    }
+    let previewDeadline = Date(timeIntervalSinceNow: 5)
+    while !previewLoaded && Date() < previewDeadline {
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.01))
+    }
+    expect(previewLoaded, "Quick Look must finish loading")
+    let previewScroll = preview.view.subviews.compactMap { $0 as? NSScrollView }.first!
+    let previewText = previewScroll.documentView as! NSTextView
+    let previewLayout = previewText.layoutManager!
+    let previewWidth = preview.view.widthAnchor.constraint(equalToConstant: 800)
+    previewWidth.isActive = true
+    func previewLineHeight(width: CGFloat) -> CGFloat {
+        previewWindow.setContentSize(NSSize(width: width, height: 500))
+        previewWidth.constant = width
+        previewWindow.displayIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
+        preview.view.layoutSubtreeIfNeeded()
+        previewLayout.ensureLayout(for: previewText.textContainer!)
+        expect(previewText.frame.width <= previewScroll.contentSize.width + 1,
+               "Preview text must stay within the viewport")
+        return previewLayout.lineFragmentRect(forGlyphAt: 999, effectiveRange: nil).minY
+    }
+    let widePreviewHeight = previewLineHeight(width: 800)
+    let narrowPreviewHeight = previewLineHeight(width: 280)
+    expect(widePreviewHeight > 0 && narrowPreviewHeight > widePreviewHeight,
+           "Quick Look must wrap unbroken lines and reflow in narrow Finder previews")
+    expect(!previewScroll.hasHorizontalScroller && previewScroll.rulersVisible,
+           "Quick Look must always show line numbers without horizontal scrolling")
+    let previewRuler = previewScroll.verticalRulerView as! LineNumberRuler
+    expect(previewRuler.index.starts == [0, 1002, 1004, 1010],
+           "Preview numbering must preserve CRLF, blank lines and the trailing empty line")
+    expect(previewText.string == previewSource, "Wrapping must not modify preview text")
+    print("PASS: Quick Look wrapping, narrow reflow, logical line numbers, independent preferences")
     EditorPreferences.showLineNumbers = false
     expect(!wrappingText.enclosingScrollView!.rulersVisible, "Line numbers can be hidden")
     EditorPreferences.showLineNumbers = true

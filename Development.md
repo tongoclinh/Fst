@@ -47,7 +47,7 @@ See [IndentGuideIndex.swift](Fst/IndentGuideIndex.swift) for block boundaries an
 
 ## Quick Look
 
-Fst embeds a native, sandboxed Quick Look preview extension covering the same declared text/source types as the editor, including SVG. Previews show selectable, highlighted source text and follow system appearance. They use default preview typography, independent of the main app's settings. Files larger than 1 MiB get an explicitly truncated preview; the extension reads only the prefix and preserves complete Unicode scalars.
+Fst embeds a native, sandboxed Quick Look preview extension covering the same declared text/source types as the editor, including SVG. Quick Look and Finder previews show selectable, highlighted source text and follow system appearance. Lines always wrap to the preview width, with logical line numbers and no horizontal scrolling. They use default preview typography, independent of the main app's wrapping and line-number settings. Files larger than 1 MiB get an explicitly truncated preview; the extension reads only the prefix and preserves complete Unicode scalars.
 
 ```sh
 just quicklook-register                    # Signed build, register, and enable the extension
